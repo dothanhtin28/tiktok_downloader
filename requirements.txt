@@ -1,5 +1,4 @@
 Flask
 gunicorn  # Production WSGI server, tốt hơn server dev của Flask
 yt-dlp    # Thư viện tải video
-uvicorn
 # Thêm các thư viện khác nếu bạn có sử dụng
