@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Downloader</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; background-color: #f0f2f5; }
+        .container { max-width: 800px; margin: 20px auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        textarea, input[type="text"], input[type="file"] {
+            width: 95%; /* Thích ứng tốt hơn */
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box; /* Quan trọng */
+            font-size: 14px;
+        }
+        textarea { min-height: 100px; }
+        .button-group button {
+            padding: 12px 20px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background-color 0.2s ease;
+        }
+        .btn-save { background-color: #4CAF50; color: white; }
+        .btn-save:hover { background-color: #45a049; }
+        .btn-download { background-color: #007bff; color: white; }
+        .btn-download:hover { background-color: #0056b3; }
+        .progress-log { margin-top: 25px; background: #f9f9f9; padding: 15px; border: 1px solid #eee; border-radius: 5px; max-height: 400px; overflow-y: auto; }
+        .progress-log h2 { margin-top: 0; }
+        .progress-log p { margin: 8px 0; padding-bottom: 8px; border-bottom: 1px dotted #ddd; font-size: 14px; }
+        .progress-log p:last-child { border-bottom: none; }
+        .flash-messages { list-style: none; padding: 0; margin-bottom: 20px; }
+        .flash-messages li { padding: 12px 15px; margin-bottom: 10px; border-radius: 4px; border: 1px solid transparent; }
+        .flash-success { background-color: #dff0d8; color: #3c763d; border-color: #d6e9c6; }
+        .flash-error { background-color: #f2dede; color: #a94442; border-color: #ebccd1; }
+        .flash-warning { background-color: #fcf8e3; color: #8a6d3b; border-color: #faebcc; }
+        .flash-info { background-color: #d9edf7; color: #31708f; border-color: #bce8f1; }
+        .path-display { /* Kiểu cho hiển thị đường dẫn */
+            display: inline-block;
+            margin-left: 10px;
+            padding: 5px 10px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            font-size: 0.9em;
+            color: #495057;
+            vertical-align: middle; /* Căn giữa với nút browse */
+        }
+        .hidden { display: none; } /* Giữ nguyên class hidden */
+        .folder-input-container { /* Bọc input file và hiển thị đường dẫn */
+             display: flex;
+             align-items: center; /* Căn giữa các item theo chiều dọc */
+             margin-bottom: 15px;
+        }
+        #save_path_browse {
+             width: auto; /* Để nút browse không chiếm toàn bộ chiều rộng */
+             margin-bottom: 0; /* Bỏ margin bottom của input file */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TikTok Downloader</h1>
+
+        <!-- Hiển thị Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+              <li class="flash-{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form method="post" id="config-form">
+            <!-- Phần Cấu hình -->
+            <h2>Cấu hình</h2>
+            <div>
+                <label for="cookie">Cookie TikTok:</label>
+                <textarea id="cookie" name="cookie" rows="3" placeholder="Dán nội dung cookie vào đây">{{ current_cookie }}</textarea>
+            </div>
+            <div>
+                <label for="save_path_browse">Thư mục lưu video:</label>
+                <div class="folder-input-container">
+                     <!-- Input để chọn thư mục -->
+                    <input type="file" id="save_path_browse" name="save_path_browse" webkitdirectory directory />
+                    <!-- Input ẩn để lưu đường dẫn thực tế gửi đi -->
+                    <input type="text" id="save_path" name="save_path" value="{{ current_save_path }}" class="hidden">
+                    <!-- Hiển thị đường dẫn đã chọn -->
+                    <span id="selected-path-display" class="path-display">{{ current_save_path if current_save_path else 'Chưa chọn thư mục' }}</span>
+                </div>
+            </div>
+             <div class="button-group">
+                 <button type="submit" name="action" value="update_settings" class="btn-save">Lưu Cookie & Đường dẫn</button>
+             </div>
+
+             <hr style="margin: 25px 0; border-top: 1px solid #eee;">
+
+            <!-- Phần Tải Video -->
+            <h2>Tải Video</h2>
+            <div>
+                <label for="links">Nhập Link Video (mỗi link một dòng):</label>
+                <textarea id="links" name="links" rows="6" placeholder="https://www.tiktok.com/@user/video/123..."></textarea>
+            </div>
+
+            <div class="button-group">
+                <!-- Nút tải giờ sẽ submit form chính -->
+                <button type="submit" name="action" value="download" class="btn-download">Bắt đầu Tải về (Song song)</button>
+            </div>
+        </form> <!-- Đóng form chính ở đây -->
+
+        <!-- Log tiến trình -->
+        {% if progress is not none and progress|length > 0 %}
+        <div class="progress-log">
+            <h2>Kết quả Tải về:</h2>
+            {% for item in progress %}
+                <p>{{ item }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        const savePathBrowse = document.getElementById('save_path_browse');
+        const savePathInput = document.getElementById('save_path'); // Input ẩn
+        const selectedPathDisplay = document.getElementById('selected-path-display'); // Span hiển thị
+
+        savePathBrowse.addEventListener('change', (event) => {
+            if (event.target.files.length > 0) {
+                // Lấy đường dẫn từ file đầu tiên (đối với chọn thư mục, nó đại diện cho thư mục)
+                // Lưu ý: Thuộc tính 'path' không phải là chuẩn và có thể không hoạt động trên mọi trình duyệt/OS.
+                // Cách đáng tin cậy hơn là lấy tên thư mục từ webkitRelativePath nếu có.
+                let files = event.target.files;
+                let firstFile = files[0];
+                let relativePath = firstFile.webkitRelativePath; // vd: "FolderName/somefile.txt"
+
+                let selectedDir = '';
+
+                if (relativePath) {
+                    // Trích xuất tên thư mục gốc từ đường dẫn tương đối
+                    selectedDir = relativePath.split('/')[0];
+                    // Cố gắng lấy đường dẫn đầy đủ hơn nếu trình duyệt cung cấp (không chuẩn)
+                    // Cách này không đáng tin cậy 100%
+                    if (firstFile.path) {
+                         // Cố gắng loại bỏ phần tên file để lấy đường dẫn thư mục
+                         let fullPath = firstFile.path;
+                         let fileName = firstFile.name;
+                         if (fullPath.endsWith(fileName)) {
+                              // Giả định cấu trúc path là /path/to/folder/file.name
+                              // hoặc C:\path\to\folder\file.name
+                              let lastSeparatorIndex = Math.max(fullPath.lastIndexOf('/'), fullPath.lastIndexOf('\\'));
+                              if (lastSeparatorIndex > -1) {
+                                   selectedDir = fullPath.substring(0, lastSeparatorIndex);
+                              } else {
+                                   selectedDir = fullPath; // Không chắc chắn lắm
+                              }
+                         } else {
+                             selectedDir = fullPath; // Không chắc chắn lắm
+                         }
+                    } else {
+                         // Nếu không có firstFile.path, chỉ dùng tên thư mục gốc
+                         // Điều này có thể không phải là đường dẫn đầy đủ mà người dùng muốn
+                         selectedDir = relativePath.substring(0, relativePath.indexOf('/'));
+                         console.warn("Không thể lấy đường dẫn đầy đủ, chỉ sử dụng tên thư mục gốc:", selectedDir);
+                    }
+
+                } else if (files.length > 0) {
+                    // Fallback nếu webkitRelativePath không có: thử dùng tên thư mục (ít tin cậy)
+                    // Điều này thường xảy ra trên Firefox khi chọn thư mục
+                    // Chúng ta không thể lấy đường dẫn đầy đủ một cách đáng tin cậy từ input type=file directory
+                    selectedDir = "Thư mục đã chọn (không lấy được đường dẫn đầy đủ)";
+                    console.warn("webkitRelativePath không khả dụng. Không thể xác định đường dẫn đầy đủ từ trình duyệt.");
+                     // Trong trường hợp này, có lẽ nên giữ lại giá trị cũ hoặc yêu cầu nhập tay?
+                     // Hoặc chỉ hiển thị thông báo và không cập nhật input ẩn.
+                     // Hiện tại, chúng ta sẽ hiển thị thông báo và không cập nhật savePathInput
+                     selectedPathDisplay.textContent = selectedDir;
+                     savePathInput.value = ''; // Xóa giá trị ẩn để tránh gửi đi đường dẫn sai
+                     return; // Dừng xử lý thêm
+                }
+
+
+                if (selectedDir) {
+                    savePathInput.value = selectedDir; // Cập nhật input ẩn để gửi đi
+                    selectedPathDisplay.textContent = selectedDir; // Cập nhật span hiển thị
+                } else {
+                     selectedPathDisplay.textContent = 'Lỗi khi lấy đường dẫn';
+                     savePathInput.value = ''; // Xóa giá trị ẩn
+                }
+
+            } else {
+                 // Nếu người dùng hủy chọn hoặc không chọn file nào
+                 // Có thể giữ nguyên giá trị cũ hoặc xóa đi
+                 selectedPathDisplay.textContent = 'Chưa chọn thư mục';
+                 savePathInput.value = current_save_path; // Giữ lại giá trị cũ nếu muốn
+            }
+        });
+
+        // Hiển thị đường dẫn hiện tại khi tải trang (nếu có)
+        // Đã thực hiện bằng cách đặt giá trị trong HTML với Jinja2
+        window.addEventListener('DOMContentLoaded', () => {
+            const currentPath = savePathInput.value;
+            if (currentPath) {
+                selectedPathDisplay.textContent = currentPath;
+            } else {
+                selectedPathDisplay.textContent = 'Chưa chọn thư mục';
+            }
+        });
+
+    </script>
+</body>
+</html>

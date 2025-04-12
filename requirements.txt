@@ -1,0 +1,4 @@
+Flask
+gunicorn  # Production WSGI server, tốt hơn server dev của Flask
+yt-dlp    # Thư viện tải video
+# Thêm các thư viện khác nếu bạn có sử dụng
